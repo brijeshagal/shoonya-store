@@ -1,52 +1,45 @@
-// import express from 'express';
-// import cors from 'cors';
-// import helmet from 'helmet';
-// import dotenv from 'dotenv';
-// import cron from 'node-cron';
-// import instagramRoutes from './routes/instagram.routes';
+import config from './config';
+import { InstagramApiClient } from './infrastructure/instagram/instagram.client';
+import { SQLiteDatabaseService } from './infrastructure/database/sqlite.database';
+import { InstagramInteractionService } from './core/services/instagram.service';
+import { Logger } from './infrastructure/logging/logger';
 
-import { InstagramClientInterface } from "./utils/client";
+const logger = new Logger('Application');
 
-// // Load environment variables
-// dotenv.config();
+async function main() {
+  try {
+    // Initialize services
+    const instagramClient = new InstagramApiClient();
+    const database = new SQLiteDatabaseService(config.DB_PATH);
+    const instagramService = new InstagramInteractionService(instagramClient, database);
 
-// const app = express();
-// const port = process.env.PORT || 3000;
+    // Initialize Instagram client
+    await instagramClient.initialize(config.INSTAGRAM_USERNAME, config.INSTAGRAM_PASSWORD);
+    logger.info('Instagram client initialized');
 
-// // Middleware
-// app.use(helmet()); // Security headers
-// app.use(cors()); // Enable CORS
-// app.use(express.json()); // Parse JSON bodies
-// app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+    // Initialize database
+    await database.initialize();
+    logger.info('Database initialized');
 
-// // Routes
-// app.use('/api/instagram', instagramRoutes);
+    // Process posts
+    const targetUsername = config.DEFAULT_TARGET_USERNAME;
+    const limit = Number(config.DEFAULT_POST_LIMIT);
+    
+    logger.info(`Starting to process posts for @${targetUsername} (limit: ${limit})`);
+    const result = await instagramService.processNewPosts(targetUsername, limit);
+    logger.info(`Processed ${result.processed} posts for @${result.username}`);
 
-// // Basic route
-// app.get('/', (req, res) => {
-//   res.json({ message: 'Welcome to Shoonya Node API' });
-// });
+    // Get and display commented posts
+    const commentedPosts = await instagramService.getCommentedPosts(targetUsername);
+    logger.info(`\nTotal commented posts for @${targetUsername}: ${commentedPosts.length}`);
+    commentedPosts.forEach(post => {
+      logger.info(`- Post ${post.postId} commented at ${post.commentedAt.toISOString()}`);
+    });
 
-// // Error handling middleware
-// app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-//   console.error(err.stack);
-//   res.status(500).json({ error: 'Something went wrong!' });
-// });
-
-// // Sample cron job (runs every minute)
-// cron.schedule('* * * * *', () => {
-//   console.log('Running a task every minute');
-// });
-
-// // Start server
-// app.listen(port, () => {
-//   console.log(`Server is running on port ${port}`);
-// }); 
-
-async function testInstagram(){
-  const instagramManager = await InstagramClientInterface.start();
-  console.log(instagramManager.state.profile)
-  // instagramManager.interaction.sendDM();
-  instagramManager.interaction.commentOnPost();
+  } catch (error) {
+    logger.error('Failed to process posts', error);
+    process.exit(1);
+  }
 }
-testInstagram();
+
+main();
