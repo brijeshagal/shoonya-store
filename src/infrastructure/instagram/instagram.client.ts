@@ -149,4 +149,28 @@ export class InstagramApiClient implements InstagramService {
       throw error;
     }
   }
+
+  async replyToComment(mediaId: string, commentId: string, text: string): Promise<InstagramInteractionResult> {
+    try {
+      await this.ig.media.comment({
+        mediaId,
+        text,
+        repliedToComment: {
+          pk: commentId
+        }
+      });
+
+      return {
+        success: true,
+        message: 'Reply posted successfully'
+      };
+    } catch (error) {
+      this.logger.error(`Failed to reply to comment ${commentId} on post ${mediaId}`, { error });
+      return {
+        success: false,
+        message: 'Failed to post reply',
+        error: error instanceof Error ? error : new Error(String(error))
+      };
+    }
+  }
 } 

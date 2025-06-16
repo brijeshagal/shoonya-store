@@ -37,6 +37,15 @@ export class SQLiteDatabaseService implements DatabaseService {
           username TEXT NOT NULL,
           commented_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           comment_text TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS comment_interactions (
+          comment_id TEXT PRIMARY KEY,
+          post_id TEXT NOT NULL,
+          username TEXT NOT NULL,
+          replied_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          reply_text TEXT NOT NULL,
+          FOREIGN KEY (post_id) REFERENCES commented_posts(post_id)
         )
       `);
       
@@ -118,6 +127,74 @@ export class SQLiteDatabaseService implements DatabaseService {
       });
     } catch (error) {
       this.logger.error('Failed to get commented posts', error);
+      throw error;
+    }
+  }
+
+  async isCommentReplied(commentId: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized');
+    try {
+      const result = this.db.exec(
+        'SELECT comment_id FROM comment_interactions WHERE comment_id = ?',
+        [commentId]
+      );
+      const isReplied = result.length > 0;
+      this.logger.info(`Comment ${commentId} is ${isReplied ? 'already' : 'not yet'} replied to`);
+      return isReplied;
+    } catch (error) {
+      this.logger.error(`Failed to check if comment ${commentId} is replied to`, error);
+      throw error;
+    }
+  }
+
+  async addCommentInteraction(commentId: string, postId: string, username: string, replyText: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+    try {
+      this.db.exec(
+        'INSERT INTO comment_interactions (comment_id, post_id, username, reply_text) VALUES (?, ?, ?, ?)',
+        [commentId, postId, username, replyText]
+      );
+      this.saveDatabase();
+      this.logger.info(`Added comment ${commentId} to interactions`);
+    } catch (error) {
+      this.logger.error(`Failed to add comment interaction ${commentId}`, error);
+      throw error;
+    }
+  }
+
+  async getCommentInteractions(postId?: string): Promise<Array<{
+    commentId: string;
+    postId: string;
+    username: string;
+    repliedAt: Date;
+    replyText: string;
+  }>> {
+    if (!this.db) throw new Error('Database not initialized');
+    try {
+      const query = postId
+        ? 'SELECT * FROM comment_interactions WHERE post_id = ?'
+        : 'SELECT * FROM comment_interactions';
+      const params = postId ? [postId] : [];
+      const result = this.db.exec(query, params);
+      
+      if (result.length === 0) return [];
+      
+      const columns = result[0].columns;
+      return result[0].values.map(row => {
+        const obj: any = {};
+        columns.forEach((col, i) => {
+          obj[col] = row[i];
+        });
+        return {
+          commentId: obj.comment_id,
+          postId: obj.post_id,
+          username: obj.username,
+          repliedAt: new Date(obj.replied_at),
+          replyText: obj.reply_text
+        };
+      });
+    } catch (error) {
+      this.logger.error('Failed to get comment interactions', error);
       throw error;
     }
   }

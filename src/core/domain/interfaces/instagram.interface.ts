@@ -38,6 +38,7 @@ export interface InstagramService {
   getPostById(mediaId: string): Promise<InstagramPost>;
   getComments(mediaId: string): Promise<InstagramComment[]>;
   postComment(mediaId: string, text: string): Promise<InstagramInteractionResult>;
+  replyToComment(mediaId: string, commentId: string, text: string): Promise<InstagramInteractionResult>;
   likePost(mediaId: string): Promise<InstagramInteractionResult>;
   getUserByUsername(username: string): Promise<InstagramUser>;
   getRecentPosts(username: string, limit: number): Promise<InstagramPost[]>;

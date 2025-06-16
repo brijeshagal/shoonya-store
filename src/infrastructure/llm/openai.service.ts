@@ -1,0 +1,140 @@
+import OpenAI from 'openai';
+import { LLMService, LLMResponse, SocialContext, MediaContent } from '../../core/domain/interfaces/llm.interface';
+import { Logger } from '../logging/logger';
+import config from '../../config';
+
+export class OpenAIService implements LLMService {
+  private openai: OpenAI;
+  private readonly logger: Logger;
+  private readonly model: string;
+
+  constructor() {
+    this.openai = new OpenAI({
+      apiKey: config.OPENAI_API_KEY
+    });
+    this.logger = new Logger('OpenAIService');
+    this.model = config.OPENAI_MODEL || 'gpt-4-turbo-preview';
+  }
+
+  private async generateContent(prompt: string, context: SocialContext): Promise<LLMResponse> {
+    try {
+      const startTime = Date.now();
+      const completion = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert social media manager and content creator for ${context.platform}.`
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 150
+      });
+
+      const processingTime = Date.now() - startTime;
+      return {
+        content: completion.choices[0].message.content || '',
+        metadata: {
+          tokens: completion.usage?.total_tokens,
+          model: this.model,
+          processingTime,
+          cost: this.calculateCost(completion.usage?.total_tokens || 0)
+        }
+      };
+    } catch (error) {
+      this.logger.error('Failed to generate content', { error });
+      throw error;
+    }
+  }
+
+  private calculateCost(tokens: number): number {
+    // Basic cost calculation (can be made more sophisticated)
+    const costPerToken = 0.00001; // Example rate
+    return tokens * costPerToken;
+  }
+
+  async generateContent(context: SocialContext, type: 'comment' | 'reply' | 'caption' | 'message'): Promise<LLMResponse> {
+    const prompt = this.buildPrompt(context, type);
+    return this.generateContent(prompt, context);
+  }
+
+  private buildPrompt(context: SocialContext, type: string): string {
+    const basePrompt = `Generate ${type} for ${context.platform} with the following context:
+    Author: ${context.author?.displayName || context.author?.username}
+    Content Type: ${context.contentType}
+    ${context.text ? `Text: ${context.text}` : ''}
+    ${context.media?.length ? `Media Types: ${context.media.map(m => m.type).join(', ')}` : ''}`;
+
+    switch (type) {
+      case 'comment':
+        return `${basePrompt}\nMake it engaging and relevant to the content.`;
+      case 'reply':
+        return `${basePrompt}\nMake it personal and conversational.`;
+      case 'caption':
+        return `${basePrompt}\nMake it creative and include appropriate hashtags.`;
+      case 'message':
+        return `${basePrompt}\nMake it natural and platform-appropriate.`;
+      default:
+        return basePrompt;
+    }
+  }
+
+  async analyzeMedia(media: MediaContent): Promise<LLMResponse> {
+    try {
+      if (media.type === 'image' && media.metadata?.url) {
+        const response = await this.openai.chat.completions.create({
+          model: this.model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert at analyzing media content.'
+            },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'Analyze this media and describe its key elements:' },
+                { type: 'image_url', image_url: media.metadata.url }
+              ]
+            }
+          ],
+          max_tokens: 200
+        });
+
+        return {
+          content: response.choices[0].message.content || '',
+          metadata: {
+            tokens: response.usage?.total_tokens,
+            model: this.model,
+            processingTime: 0 // TODO: Add timing
+          }
+        };
+      }
+      throw new Error(`Unsupported media type: ${media.type}`);
+    } catch (error) {
+      this.logger.error('Failed to analyze media', { error });
+      throw error;
+    }
+  }
+
+  async generateSummary(context: SocialContext): Promise<LLMResponse> {
+    const prompt = `Generate a concise summary of the following ${context.platform} content:
+    ${context.text ? `Text: ${context.text}` : ''}
+    ${context.media?.length ? `Media Types: ${context.media.map(m => m.type).join(', ')}` : ''}
+    Make it informative and capture the key points.`;
+
+    return this.generateContent(prompt, context);
+  }
+
+  async generateEngagement(context: SocialContext): Promise<LLMResponse> {
+    const prompt = `Generate engagement suggestions for this ${context.platform} content:
+    ${context.text ? `Text: ${context.text}` : ''}
+    ${context.media?.length ? `Media Types: ${context.media.map(m => m.type).join(', ')}` : ''}
+    Provide specific, actionable suggestions to increase engagement.`;
+
+    return this.generateContent(prompt, context);
+  }
+} 
