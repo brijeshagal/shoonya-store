@@ -21,7 +21,7 @@ const configSchema = z.object({
   DEFAULT_TARGET_USERNAME: z.string().default('shoonya_store'),
   DEFAULT_POST_LIMIT: z.string().default('5'),
   COMMENT_TEMPLATE: z.string().default('Great post! Keep up the amazing work! 👏'),
-  COMMENT_TARGET_USERNAME: z.string().default('shoonya.ai'),
+  COMMENT_TARGET_USERNAME: z.string().default('shoonyaai'),
   COMMENT_POST_LIMIT: z.string().default('5'),
 
   // OpenAI configuration

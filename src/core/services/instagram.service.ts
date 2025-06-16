@@ -1,6 +1,6 @@
 import { InstagramService, InstagramPost, InstagramComment, InstagramUser, InstagramInteractionResult } from '../domain/interfaces/instagram.interface';
 import { DatabaseService } from '../domain/interfaces/database.interface';
-import { Logger } from '../../infrastructure/logging/logger';
+import { Logger } from '../../../scripts/logging/logger';
 
 export class InstagramInteractionService {
   private readonly instagram: InstagramService;

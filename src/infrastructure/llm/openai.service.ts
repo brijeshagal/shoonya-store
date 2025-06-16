@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { LLMService, LLMResponse, SocialContext, MediaContent } from '../../core/domain/interfaces/llm.interface';
-import { Logger } from '../logging/logger';
+import { Logger } from '../../../scripts/logging/logger';
 import config from '../../config';
 
 export class OpenAIService implements LLMService {

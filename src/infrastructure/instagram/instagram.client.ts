@@ -155,9 +155,7 @@ export class InstagramApiClient implements InstagramService {
       await this.ig.media.comment({
         mediaId,
         text,
-        repliedToComment: {
-          pk: commentId
-        }
+        replyToCommentId: commentId
       });
 
       return {

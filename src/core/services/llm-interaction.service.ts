@@ -1,6 +1,6 @@
 import { LLMService, SocialContext, MediaContent } from '../domain/interfaces/llm.interface';
 import { InstagramService, InstagramPost, InstagramComment } from '../domain/interfaces/instagram.interface';
-import { Logger } from '../../infrastructure/logging/logger';
+import { Logger } from '../../../scripts/logging/logger';
 
 export class LLMInteractionService {
   private readonly llm: LLMService;
