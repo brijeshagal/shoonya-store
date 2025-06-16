@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { LLMService, LLMResponse, SocialContext, MediaContent } from '../../core/domain/interfaces/llm.interface';
-import { Logger } from '../../../scripts/logging/logger';
 import config from '../../config';
+import { Logger } from '../../scripts/logging/logger';
 
 export class OpenAIService implements LLMService {
   private openai: OpenAI;
@@ -16,7 +16,7 @@ export class OpenAIService implements LLMService {
     this.model = config.OPENAI_MODEL || 'gpt-4-turbo-preview';
   }
 
-  private async generateContent(prompt: string, context: SocialContext): Promise<LLMResponse> {
+  private async _generateContent(prompt: string, context: SocialContext): Promise<LLMResponse> {
     try {
       const startTime = Date.now();
       const completion = await this.openai.chat.completions.create({
@@ -59,7 +59,7 @@ export class OpenAIService implements LLMService {
 
   async generateContent(context: SocialContext, type: 'comment' | 'reply' | 'caption' | 'message'): Promise<LLMResponse> {
     const prompt = this.buildPrompt(context, type);
-    return this.generateContent(prompt, context);
+    return this._generateContent(prompt, context);
   }
 
   private buildPrompt(context: SocialContext, type: string): string {
@@ -96,8 +96,16 @@ export class OpenAIService implements LLMService {
             {
               role: 'user',
               content: [
-                { type: 'text', text: 'Analyze this media and describe its key elements:' },
-                { type: 'image_url', image_url: media.metadata.url }
+                {
+                  type: 'text',
+                  text: 'Analyze this media and describe its key elements:'
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: media.metadata.url
+                  }
+                }
               ]
             }
           ],
@@ -126,7 +134,7 @@ export class OpenAIService implements LLMService {
     ${context.media?.length ? `Media Types: ${context.media.map(m => m.type).join(', ')}` : ''}
     Make it informative and capture the key points.`;
 
-    return this.generateContent(prompt, context);
+    return this._generateContent(prompt, context);
   }
 
   async generateEngagement(context: SocialContext): Promise<LLMResponse> {
@@ -135,6 +143,6 @@ export class OpenAIService implements LLMService {
     ${context.media?.length ? `Media Types: ${context.media.map(m => m.type).join(', ')}` : ''}
     Provide specific, actionable suggestions to increase engagement.`;
 
-    return this.generateContent(prompt, context);
+    return this._generateContent(prompt, context);
   }
 } 

@@ -1,6 +1,6 @@
 import { LLMService, SocialContext, MediaContent } from '../domain/interfaces/llm.interface';
 import { InstagramService, InstagramPost, InstagramComment } from '../domain/interfaces/instagram.interface';
-import { Logger } from '../../../scripts/logging/logger';
+import { Logger } from '../../scripts/logging/logger';
 
 export class LLMInteractionService {
   private readonly llm: LLMService;
@@ -58,7 +58,7 @@ export class LLMInteractionService {
 
       // Generate comment using LLM
       const commentResponse = await this.llm.generateContent(context, 'comment');
-      this.logger.info('Generated comment', { comment: commentResponse.content });
+      this.logger.info(`Generated comment: ${commentResponse.content}`);
 
       // Post the generated comment
       const result = await this.instagram.postComment(postId, commentResponse.content);
@@ -79,7 +79,7 @@ export class LLMInteractionService {
         };
 
         const replyResponse = await this.llm.generateContent(replyContext, 'reply');
-        this.logger.info('Generated reply', { reply: replyResponse.content });
+        this.logger.info(`Generated reply: ${replyResponse.content}`);
 
         const replyResult = await this.instagram.replyToComment(postId, comment.id, replyResponse.content);
         if (!replyResult.success) {
@@ -100,7 +100,7 @@ export class LLMInteractionService {
       // Analyze media if available
       if (context.media?.length) {
         const analysis = await this.llm.analyzeMedia(context.media[0]);
-        this.logger.info('Media analysis complete', { analysis: analysis.content });
+        this.logger.info(`Media analysis complete: ${analysis.content}`);
 
         // Generate caption based on analysis
         const captionResponse = await this.llm.generateContent(context, 'caption');

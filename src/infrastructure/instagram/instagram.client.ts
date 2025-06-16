@@ -1,6 +1,6 @@
 import { IgApiClient } from 'instagram-private-api';
 import { InstagramService, InstagramPost, InstagramUser, InstagramComment, InstagramInteractionResult } from '../../core/domain/interfaces/instagram.interface';
-import { Logger } from '../logging/logger';
+import { Logger } from '../../scripts/logging/logger';
 
 export class InstagramApiClient implements InstagramService {
   private ig: IgApiClient;

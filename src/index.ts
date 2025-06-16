@@ -2,7 +2,7 @@ import config from './config';
 import { InstagramApiClient } from './infrastructure/instagram/instagram.client';
 import { SQLiteDatabaseService } from './infrastructure/database/sqlite.database';
 import { InstagramInteractionService } from './core/services/instagram.service';
-import { Logger } from '../scripts/logging/logger';
+import { Logger } from './scripts/logging/logger';
 
 const logger = new Logger('Application');
 

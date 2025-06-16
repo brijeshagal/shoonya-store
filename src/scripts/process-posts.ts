@@ -1,6 +1,6 @@
 import { InstagramApiClient } from '../infrastructure/instagram/instagram.client';
 import { SQLiteDatabaseService } from '../infrastructure/database/sqlite.database';
-import { Logger } from '../infrastructure/logging/logger';
+import { Logger } from './logging/logger';
 import dotenv from 'dotenv';
 
 // Load environment variables

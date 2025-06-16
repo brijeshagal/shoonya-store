@@ -1,7 +1,7 @@
 import initSqlJs, { Database } from 'sql.js';
 import * as fs from 'fs';
 import { DatabaseService, CommentedPost } from '../../core/domain/interfaces/database.interface';
-import { Logger } from '../../../scripts/logging/logger';
+import { Logger } from '../../scripts/logging/logger';
 
 export class SQLiteDatabaseService implements DatabaseService {
   private db: Database | null = null;
