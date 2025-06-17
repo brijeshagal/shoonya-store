@@ -1,15 +1,39 @@
 import config from './config';
-import { InstagramApiClient } from './infrastructure/instagram/instagram.client';
-import { SQLiteDatabaseService } from './infrastructure/database/sqlite.database';
+import { InstagramGraphService } from './core/services/instagram-graph.service';
 import { InstagramInteractionService } from './core/services/instagram.service';
+import { LLMInteractionService } from './core/services/llm-interaction.service';
+import { SQLiteDatabaseService } from './infrastructure/database/sqlite.database';
+import { OpenAIService } from './infrastructure/llm/openai.service';
 import { Logger } from './scripts/logging/logger';
 
 const logger = new Logger('Application');
 
+async function processUserPosts(instagramService: InstagramInteractionService) {
+
+  // Process posts for the default target
+  const targetUsername = config.DEFAULT_TARGET_USERNAME;
+  const limit = Number(config.DEFAULT_POST_LIMIT);
+
+  try {
+    logger.info(`Starting to process posts for @${targetUsername} (limit: ${limit})`);
+    const result = await instagramService.processNewPosts(targetUsername, limit);
+    logger.info(`Processed ${result.processed} posts for @${result.username}`);
+
+    // Get and display commented posts
+    const commentedPosts = await instagramService.getCommentedPosts(targetUsername);
+    logger.info(`\nTotal commented posts for @${targetUsername}: ${commentedPosts.length}`);
+    commentedPosts.forEach(post => {
+      logger.info(`- Post ${post.postId} commented at ${post.commentedAt.toISOString()}`);
+    });
+  } catch (error) {
+    logger.error(`Failed to process posts for @${targetUsername}`, error);
+  }
+}
+
 async function processCommentInteractions(instagramService: InstagramInteractionService, targetUsername: string, limit: number) {
   try {
     logger.info(`Starting to process comment interactions for @${targetUsername} (limit: ${limit})`);
-    
+
     // Get recent posts from the target account
     const posts = await instagramService.getRecentPosts(targetUsername, limit);
     logger.info(`Found ${posts.length} posts to process comments for`);
@@ -18,7 +42,7 @@ async function processCommentInteractions(instagramService: InstagramInteraction
       try {
         logger.info(`\nProcessing comments for post ${post.id}:`);
         logger.info(`- Caption: ${post.caption?.substring(0, 50)}...`);
-        
+
         // Get comments for the post
         let comments;
         try {
@@ -43,11 +67,13 @@ async function processCommentInteractions(instagramService: InstagramInteraction
               continue;
             }
 
-            const reply = "Automated Comment Test!"; // TODO: Implement reply generation
-            
+            // Generate reply using LLM
+            const reply = await instagramService.generateReplyToComment(comment);
+            logger.info(`Generated reply: ${reply}`);
+
             logger.info(`Attempting to reply to comment ${comment.id}...`);
             const result = await instagramService.replyToComment(post.id, comment.id, reply);
-            
+
             if (result.success) {
               await instagramService.addCommentInteraction(comment.id, post.id, targetUsername, reply);
               logger.info(`Successfully replied to comment ${comment.id}`);
@@ -85,41 +111,22 @@ async function processCommentInteractions(instagramService: InstagramInteraction
 async function main() {
   try {
     // Initialize services
-    const instagramClient = new InstagramApiClient();
+    const instagramClient = new InstagramGraphService();
     const database = new SQLiteDatabaseService(config.DB_PATH);
-    const instagramService = new InstagramInteractionService(instagramClient, database);
-
-    // Initialize Instagram client
-    await instagramClient.initialize(config.INSTAGRAM_USERNAME, config.INSTAGRAM_PASSWORD);
-    logger.info('Instagram client initialized');
+    const llmService = new OpenAIService();
+    const llmInteractionService = new LLMInteractionService(llmService);
+    const instagramService = new InstagramInteractionService(instagramClient, database, llmInteractionService);
 
     // Initialize database
     await database.initialize();
     logger.info('Database initialized');
 
-    // Process posts for the default target
-    const targetUsername = config.DEFAULT_TARGET_USERNAME;
-    const limit = Number(config.DEFAULT_POST_LIMIT);
-    
-    try {
-      logger.info(`Starting to process posts for @${targetUsername} (limit: ${limit})`);
-      const result = await instagramService.processNewPosts(targetUsername, limit);
-      logger.info(`Processed ${result.processed} posts for @${result.username}`);
-
-      // Get and display commented posts
-      const commentedPosts = await instagramService.getCommentedPosts(targetUsername);
-      logger.info(`\nTotal commented posts for @${targetUsername}: ${commentedPosts.length}`);
-      commentedPosts.forEach(post => {
-        logger.info(`- Post ${post.postId} commented at ${post.commentedAt.toISOString()}`);
-      });
-    } catch (error) {
-      logger.error(`Failed to process posts for @${targetUsername}`, error);
-    }
+    processUserPosts(instagramService);
 
     // Process comment interactions for a different account
     const commentTargetUsername = config.COMMENT_TARGET_USERNAME || 'shoonyaai';
     const commentLimit = Number(config.COMMENT_POST_LIMIT || '5');
-    await processCommentInteractions(instagramService, commentTargetUsername, commentLimit);
+    processCommentInteractions(instagramService, commentTargetUsername, commentLimit);
 
   } catch (error) {
     logger.error('Application failed', error);

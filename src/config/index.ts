@@ -18,11 +18,11 @@ const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
   // Instagram settings
-  DEFAULT_TARGET_USERNAME: z.string().default('shoonya_store'),
+  DEFAULT_TARGET_USERNAME: z.string().default('shoonyastore'),
   DEFAULT_POST_LIMIT: z.string().default('5'),
   COMMENT_TEMPLATE: z.string().default('Great post! Keep up the amazing work! 👏'),
   COMMENT_TARGET_USERNAME: z.string().default('shoonyaai'),
-  COMMENT_POST_LIMIT: z.string().default('5'),
+  COMMENT_POST_LIMIT: z.string().default('1'),
 
   // OpenAI configuration
   OPENAI_API_KEY: z.string().min(1),

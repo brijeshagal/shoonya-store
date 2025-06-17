@@ -13,17 +13,10 @@ export interface MediaContent {
   };
 }
 
-export interface SocialContext {
-  platform: string;
-  contentType: 'post' | 'comment' | 'message' | 'tweet';
-  contentId?: string;
-  author?: {
-    id?: string;
-    username?: string;
-    displayName?: string;
-  };
+export interface ContentContext {
+  type: 'post' | 'comment' | 'message';
+  content: string;
   media?: MediaContent[];
-  text?: string;
   metadata?: Record<string, any>;
 }
 
@@ -39,8 +32,28 @@ export interface LLMResponse {
 }
 
 export interface LLMService {
-  generateContent(context: SocialContext, type: 'comment' | 'reply' | 'caption' | 'message'): Promise<LLMResponse>;
+  /**
+   * Analyzes media content and returns a description
+   */
   analyzeMedia(media: MediaContent): Promise<LLMResponse>;
-  generateSummary(context: SocialContext): Promise<LLMResponse>;
-  generateEngagement(context: SocialContext): Promise<LLMResponse>;
+
+  /**
+   * Generates a comment based on the content context
+   */
+  generateComment(context: ContentContext): Promise<LLMResponse>;
+
+  /**
+   * Generates a reply to a comment
+   */
+  generateReply(context: ContentContext): Promise<LLMResponse>;
+
+  /**
+   * Generates a caption for media content
+   */
+  generateCaption(context: ContentContext): Promise<LLMResponse>;
+
+  /**
+   * Generates a summary of the content
+   */
+  generateSummary(context: ContentContext): Promise<LLMResponse>;
 } 

@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { LLMService, LLMResponse, SocialContext, MediaContent } from '../../core/domain/interfaces/llm.interface';
+import { LLMService, LLMResponse, ContentContext, MediaContent } from '../../core/domain/interfaces/llm.interface';
 import config from '../../config';
 import { Logger } from '../../scripts/logging/logger';
 
@@ -16,7 +16,7 @@ export class OpenAIService implements LLMService {
     this.model = config.OPENAI_MODEL || 'gpt-4-turbo-preview';
   }
 
-  private async _generateContent(prompt: string, context: SocialContext): Promise<LLMResponse> {
+  private async _generateContent(prompt: string): Promise<LLMResponse> {
     try {
       const startTime = Date.now();
       const completion = await this.openai.chat.completions.create({
@@ -24,7 +24,7 @@ export class OpenAIService implements LLMService {
         messages: [
           {
             role: 'system',
-            content: `You are an expert social media manager and content creator for ${context.platform}.`
+            content: 'You are an expert social media manager and content creator.'
           },
           {
             role: 'user',
@@ -55,32 +55,6 @@ export class OpenAIService implements LLMService {
     // Basic cost calculation (can be made more sophisticated)
     const costPerToken = 0.00001; // Example rate
     return tokens * costPerToken;
-  }
-
-  async generateContent(context: SocialContext, type: 'comment' | 'reply' | 'caption' | 'message'): Promise<LLMResponse> {
-    const prompt = this.buildPrompt(context, type);
-    return this._generateContent(prompt, context);
-  }
-
-  private buildPrompt(context: SocialContext, type: string): string {
-    const basePrompt = `Generate ${type} for ${context.platform} with the following context:
-    Author: ${context.author?.displayName || context.author?.username}
-    Content Type: ${context.contentType}
-    ${context.text ? `Text: ${context.text}` : ''}
-    ${context.media?.length ? `Media Types: ${context.media.map(m => m.type).join(', ')}` : ''}`;
-
-    switch (type) {
-      case 'comment':
-        return `${basePrompt}\nMake it engaging and relevant to the content.`;
-      case 'reply':
-        return `${basePrompt}\nMake it personal and conversational.`;
-      case 'caption':
-        return `${basePrompt}\nMake it creative and include appropriate hashtags.`;
-      case 'message':
-        return `${basePrompt}\nMake it natural and platform-appropriate.`;
-      default:
-        return basePrompt;
-    }
   }
 
   async analyzeMedia(media: MediaContent): Promise<LLMResponse> {
@@ -128,21 +102,39 @@ export class OpenAIService implements LLMService {
     }
   }
 
-  async generateSummary(context: SocialContext): Promise<LLMResponse> {
-    const prompt = `Generate a concise summary of the following ${context.platform} content:
-    ${context.text ? `Text: ${context.text}` : ''}
+  async generateComment(context: ContentContext): Promise<LLMResponse> {
+    const prompt = `Generate an engaging comment for the following content:
+    ${context.content}
+    ${context.media?.length ? `Media Types: ${context.media.map(m => m.type).join(', ')}` : ''}
+    Make it relevant, engaging, and encourage interaction.`;
+
+    return this._generateContent(prompt);
+  }
+
+  async generateReply(context: ContentContext): Promise<LLMResponse> {
+    const prompt = `Generate a reply to the following comment:
+    Comment: ${context.content}
+    ${context.metadata?.username ? `From: ${context.metadata.username}` : ''}
+    Make it personal, conversational, and encourage further interaction.`;
+
+    return this._generateContent(prompt);
+  }
+
+  async generateCaption(context: ContentContext): Promise<LLMResponse> {
+    const prompt = `Generate a creative caption for the following content:
+    ${context.content}
+    ${context.media?.length ? `Media Types: ${context.media.map(m => m.type).join(', ')}` : ''}
+    Make it engaging and include appropriate hashtags.`;
+
+    return this._generateContent(prompt);
+  }
+
+  async generateSummary(context: ContentContext): Promise<LLMResponse> {
+    const prompt = `Generate a concise summary of the following content:
+    ${context.content}
     ${context.media?.length ? `Media Types: ${context.media.map(m => m.type).join(', ')}` : ''}
     Make it informative and capture the key points.`;
 
-    return this._generateContent(prompt, context);
-  }
-
-  async generateEngagement(context: SocialContext): Promise<LLMResponse> {
-    const prompt = `Generate engagement suggestions for this ${context.platform} content:
-    ${context.text ? `Text: ${context.text}` : ''}
-    ${context.media?.length ? `Media Types: ${context.media.map(m => m.type).join(', ')}` : ''}
-    Provide specific, actionable suggestions to increase engagement.`;
-
-    return this._generateContent(prompt, context);
+    return this._generateContent(prompt);
   }
 } 

@@ -1,20 +1,47 @@
-import { InstagramService, InstagramPost, InstagramComment, InstagramUser, InstagramInteractionResult } from '../domain/interfaces/instagram.interface';
+import { Logger } from '../../scripts/logging/logger';
 import { DatabaseService } from '../domain/interfaces/database.interface';
-import { Logger } from '@/scripts/logging/logger';
+import { InstagramComment, InstagramInteractionResult, InstagramPost, InstagramService, InstagramUser } from '../domain/interfaces/instagram.interface';
+import { LLMInteractionService } from './llm-interaction.service';
+import { ContentContext, MediaContent } from '../domain/interfaces/llm.interface';
 
 export class InstagramInteractionService {
   private readonly instagram: InstagramService;
   private readonly database: DatabaseService;
   private readonly logger: Logger;
+  private readonly llmService: LLMInteractionService;
 
-  constructor(instagram: InstagramService, database: DatabaseService) {
+  constructor(instagram: InstagramService, database: DatabaseService, llmService: LLMInteractionService) {
     this.instagram = instagram;
     this.database = database;
     this.logger = new Logger('InstagramInteractionService');
+    this.llmService = llmService;
   }
 
-  async initialize(): Promise<void> {
-    await this.database.initialize();
+  private createContentContext(post: InstagramPost): ContentContext {
+    const media: MediaContent[] = [];
+    
+    // Add image if available
+    if (post.mediaType === 1 && post.rawData?.image_versions2?.candidates?.[0]?.url) {
+      media.push({
+        type: 'image',
+        content: post.rawData.image_versions2.candidates[0].url,
+        metadata: {
+          url: post.rawData.image_versions2.candidates[0].url,
+          mimeType: 'image/jpeg'
+        }
+      });
+    }
+
+    return {
+      type: 'post',
+      content: post.caption || '',
+      media,
+      metadata: {
+        likeCount: post.likeCount,
+        commentCount: post.commentCount,
+        mediaType: post.mediaType
+      }
+    };
   }
 
   async processNewPosts(username: string = "shoonya_store", limit: number = 5): Promise<{ processed: number; username: string }> {
@@ -36,12 +63,16 @@ export class InstagramInteractionService {
           continue;
         }
         
-        const comment = "Great post! Keep up the amazing work! 👏"; // TODO: Implement comment generation
-        
         try {
-          this.logger.info(`Attempting to comment on post ${post.id}...`);
-          const result = await this.instagram.postComment(post.id, comment);
+          // Create content context for LLM
+          const context = this.createContentContext(post);
           
+          // Generate comment using LLM
+          const comment = await this.llmService.generateComment(context);
+          this.logger.info(`Generated comment: ${comment}`);
+
+          // Post the comment
+          const result = await this.instagram.postComment(post.id, comment);
           if (result.success) {
             await this.database.addCommentedPost(post.id, username, comment);
             this.logger.info(`Successfully commented on post ${post.id}`);
@@ -50,7 +81,7 @@ export class InstagramInteractionService {
             this.logger.error(`Failed to comment on post ${post.id}: ${result.message}`);
           }
         } catch (error) {
-          this.logger.error(`Error commenting on post ${post.id}`, error);
+          this.logger.error(`Error processing post ${post.id}`, error);
         }
       }
 
@@ -77,12 +108,22 @@ export class InstagramInteractionService {
           continue;
         }
 
-        const reply = "Thanks for your comment! 🙏"; // TODO: Implement reply generation
-        
         try {
-          this.logger.info(`Attempting to reply to comment ${comment.id}...`);
+          // Create content context for reply
+          const context: ContentContext = {
+            type: 'comment',
+            content: comment.text,
+            metadata: {
+              username: comment.username
+            }
+          };
+
+          // Generate reply using LLM
+          const reply = await this.llmService.generateReply(context);
+          this.logger.info(`Generated reply: ${reply}`);
+
+          // Post the reply
           const result = await this.instagram.replyToComment(postId, comment.id, reply);
-          
           if (result.success) {
             await this.database.addCommentInteraction(comment.id, postId, username, reply);
             this.logger.info(`Successfully replied to comment ${comment.id}`);
@@ -90,7 +131,7 @@ export class InstagramInteractionService {
             this.logger.error(`Failed to reply to comment ${comment.id}: ${result.message}`);
           }
         } catch (error) {
-          this.logger.error(`Error replying to comment ${comment.id}`, error);
+          this.logger.error(`Error processing comment ${comment.id}`, error);
         }
       }
     } catch (error) {
@@ -133,5 +174,19 @@ export class InstagramInteractionService {
 
   async getCommentInteractions(postId?: string) {
     return await this.database.getCommentInteractions(postId);
+  }
+
+  /**
+   * Generates a reply to a comment using the LLM service
+   */
+  async generateReplyToComment(comment: InstagramComment): Promise<string> {
+    const context: ContentContext = {
+      type: 'comment',
+      content: comment.text,
+      metadata: {
+        username: comment.username
+      }
+    };
+    return this.llmService.generateReply(context);
   }
 } 

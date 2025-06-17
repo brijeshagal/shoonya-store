@@ -1,128 +1,81 @@
-import { LLMService, SocialContext, MediaContent } from '../domain/interfaces/llm.interface';
-import { InstagramService, InstagramPost, InstagramComment } from '../domain/interfaces/instagram.interface';
+import { LLMService, ContentContext, MediaContent } from '../domain/interfaces/llm.interface';
 import { Logger } from '../../scripts/logging/logger';
 
 export class LLMInteractionService {
   private readonly llm: LLMService;
-  private readonly instagram: InstagramService;
   private readonly logger: Logger;
 
-  constructor(llm: LLMService, instagram: InstagramService) {
+  constructor(llm: LLMService) {
     this.llm = llm;
-    this.instagram = instagram;
     this.logger = new Logger('LLMInteractionService');
   }
 
-  private createSocialContext(post: InstagramPost, comments?: InstagramComment[]): SocialContext {
-    const media: MediaContent[] = [];
-    
-    // Add image if available
-    if (post.mediaType === 1 && post.rawData?.image_versions2?.candidates?.[0]?.url) {
-      media.push({
-        type: 'image',
-        content: post.rawData.image_versions2.candidates[0].url,
-        metadata: {
-          url: post.rawData.image_versions2.candidates[0].url,
-          mimeType: 'image/jpeg'
-        }
-      });
-    }
-
-    return {
-      platform: 'instagram',
-      contentType: 'post',
-      contentId: post.id,
-      author: {
-        id: post.user.id,
-        username: post.user.username,
-        displayName: post.user.fullName
-      },
-      text: post.caption,
-      media,
-      metadata: {
-        likeCount: post.likeCount,
-        commentCount: post.commentCount,
-        mediaType: post.mediaType
-      }
-    };
-  }
-
-  async processPostWithLLM(postId: string): Promise<void> {
+  /**
+   * Analyzes media content and returns a description
+   */
+  async analyzeMedia(media: MediaContent): Promise<string> {
     try {
-      // Get post details
-      const post = await this.instagram.getPostById(postId);
-      const comments = await this.instagram.getComments(postId);
-
-      // Create context for LLM
-      const context = this.createSocialContext(post, comments);
-
-      // Generate comment using LLM
-      const commentResponse = await this.llm.generateContent(context, 'comment');
-      this.logger.info(`Generated comment: ${commentResponse.content}`);
-
-      // Post the generated comment
-      const result = await this.instagram.postComment(postId, commentResponse.content);
-      if (!result.success) {
-        throw new Error(`Failed to post comment: ${result.message}`);
-      }
-
-      // Process comments with LLM
-      for (const comment of comments) {
-        const replyContext: SocialContext = {
-          ...context,
-          contentType: 'comment',
-          contentId: comment.id,
-          text: comment.text,
-          author: {
-            username: comment.username
-          }
-        };
-
-        const replyResponse = await this.llm.generateContent(replyContext, 'reply');
-        this.logger.info(`Generated reply: ${replyResponse.content}`);
-
-        const replyResult = await this.instagram.replyToComment(postId, comment.id, replyResponse.content);
-        if (!replyResult.success) {
-          this.logger.error(`Failed to reply to comment ${comment.id}`, { error: replyResult.message });
-        }
-      }
+      const response = await this.llm.analyzeMedia(media);
+      this.logger.info('Media analysis complete');
+      return response.content;
     } catch (error) {
-      this.logger.error('Failed to process post with LLM', { error, postId });
+      this.logger.error('Failed to analyze media', { error });
       throw error;
     }
   }
 
-  async analyzeAndCaptionPost(postId: string): Promise<string> {
+  /**
+   * Generates a comment based on the content context
+   */
+  async generateComment(context: ContentContext): Promise<string> {
     try {
-      const post = await this.instagram.getPostById(postId);
-      const context = this.createSocialContext(post);
-      
-      // Analyze media if available
-      if (context.media?.length) {
-        const analysis = await this.llm.analyzeMedia(context.media[0]);
-        this.logger.info(`Media analysis complete: ${analysis.content}`);
-
-        // Generate caption based on analysis
-        const captionResponse = await this.llm.generateContent(context, 'caption');
-        return captionResponse.content;
-      }
-
-      throw new Error('Post does not contain media to analyze');
+      const response = await this.llm.generateComment(context);
+      this.logger.info('Comment generated successfully');
+      return response.content;
     } catch (error) {
-      this.logger.error('Failed to analyze and caption post', { error, postId });
+      this.logger.error('Failed to generate comment', { error });
       throw error;
     }
   }
 
-  async generateEngagementStrategy(postId: string): Promise<string> {
+  /**
+   * Generates a reply to a comment
+   */
+  async generateReply(context: ContentContext): Promise<string> {
     try {
-      const post = await this.instagram.getPostById(postId);
-      const context = this.createSocialContext(post);
-      
-      const engagementResponse = await this.llm.generateEngagement(context);
-      return engagementResponse.content;
+      const response = await this.llm.generateReply(context);
+      this.logger.info('Reply generated successfully');
+      return response.content;
     } catch (error) {
-      this.logger.error('Failed to generate engagement strategy', { error, postId });
+      this.logger.error('Failed to generate reply', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Generates a caption for media content
+   */
+  async generateCaption(context: ContentContext): Promise<string> {
+    try {
+      const response = await this.llm.generateCaption(context);
+      this.logger.info('Caption generated successfully');
+      return response.content;
+    } catch (error) {
+      this.logger.error('Failed to generate caption', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Generates a summary of the content
+   */
+  async generateSummary(context: ContentContext): Promise<string> {
+    try {
+      const response = await this.llm.generateSummary(context);
+      this.logger.info('Summary generated successfully');
+      return response.content;
+    } catch (error) {
+      this.logger.error('Failed to generate summary', { error });
       throw error;
     }
   }
